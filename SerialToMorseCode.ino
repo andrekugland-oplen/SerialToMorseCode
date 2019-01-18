@@ -166,6 +166,8 @@ void readSerialAndEnqueueSignals() {
         /* 1 time unit of silence after each dot or dash */
         case '.':
         case '-': currentMillis += MORSE_TIME_UNIT; break;
+
+
       }
       signalBuffer.push(signal_t{currentMillis, 0});
     }
@@ -180,13 +182,11 @@ void readSerialAndEnqueueSignals() {
 void outputEnqueuedSignals() {
   if (!signalBuffer.isEmpty()) {
     byte nextSignal;
-    unsigned long nextChange, currentMillis, lostTime = 0;
+    unsigned long nextChange, currentMillis;
 
     currentMillis = millis();
     nextChange = signalBuffer.first().afterMillis;
-    nextChange += lostTime;
     if (nextChange <= currentMillis) {
-      lostTime = currentMillis - nextChange;
       nextSignal = signalBuffer.first().value;
       if (nextSignal != 3) {
         digitalWrite(OUTPUT_PIN, nextSignal);
