@@ -159,15 +159,11 @@ void readSerialAndEnqueueSignals() {
 
         /* 7 time units of silence after each dot or dash (4, as all characters end with 3) */
         case '/': currentMillis += 2 * MORSE_TIME_UNIT;
-
         /* 3 time units of silence after each letter (2, as all dots and dashes end with 1) */
         case ' ': currentMillis += MORSE_TIME_UNIT;
-
         /* 1 time unit of silence after each dot or dash */
         case '.':
         case '-': currentMillis += MORSE_TIME_UNIT; break;
-
-
       }
       signalBuffer.push(signal_t{currentMillis, 0});
     }
