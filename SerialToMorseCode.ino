@@ -80,9 +80,9 @@ const morse_code_t morse_code_tbl[36] PROGMEM = {
 };
 
 /*
- * Encodes a letter to morse code, using '.' for dots, '-' for dashes,
- * ' ' for silence between letters and '/' for silence between words.
- */
+   Encodes a letter to morse code, using '.' for dots, '-' for dashes,
+   ' ' for silence between letters and '/' for silence between words.
+*/
 int encode_morse(char letter, char *buffer) {
   int i, j, size = 0;
   morse_code_t table_item;
@@ -162,23 +162,21 @@ void readSerialAndEnqueueSignals() {
 
         /* 3 time units of silence after each letter (2, as all dots and dashes end with 1) */
         case ' ': currentMillis += MORSE_TIME_UNIT;
-        
+
         /* 1 time unit of silence after each dot or dash */
         case '.':
         case '-': currentMillis += MORSE_TIME_UNIT; break;
-        
-        
       }
       signalBuffer.push(signal_t{currentMillis, 0});
     }
-  } 
+  }
 }
 
 
 /*
- * Output enqueued signals (and silences) to the pre-defined pin when
- * their time (er, millis()) is come.
- */
+   Output enqueued signals (and silences) to the pre-defined pin when
+   their time (er, millis()) is come.
+*/
 void outputEnqueuedSignals() {
   if (!signalBuffer.isEmpty()) {
     byte nextSignal;
@@ -195,7 +193,7 @@ void outputEnqueuedSignals() {
       }
       signalBuffer.shift();
     }
-  }  
+  }
 }
 
 
