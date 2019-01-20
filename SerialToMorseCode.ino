@@ -112,11 +112,8 @@ CircularBuffer<signal_t, 11> signalBuffer;
 */
 void enqueue_char_from_serial()
 {
-  unsigned available = Serial.available();
- 
-  if (available > 0 && !charBuffer.isFull()) {
+  if (!charBuffer.isFull() && Serial.available())
     charBuffer.push(Serial.read());
-  }
 
   /* If, however, our buffer is full, we don't have to worry, since
      the UART has 64 bytes of buffer, and after this buffer is full,
