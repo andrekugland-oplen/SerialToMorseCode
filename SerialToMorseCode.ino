@@ -4,19 +4,25 @@
    Converts the input received from the serial interface to Morse code,
    driving a pin with the resulting code.
 
-   modified 15 Jan 2019
+   It uses two circular buffers, one for the characters read from the serial
+   interface and another one for the timed signals (millis, HIGH/LOW) to drive
+   the pin.
+
+   modified 20 Jan 2019
    by Andre Kugland
 
    This example code is in the public domain.
 */
+
 
 #include <CircularBuffer.h>
 
 
 /* You can change the following two definitions to your liking. */
 
-#define OUTPUT_PIN LED_BUILTIN            /* Output pin */
-#define MORSE_TIME_UNIT 200               /* Base time unit of the output code */
+#define OUTPUT_PIN          LED_BUILTIN   /* Output pin */
+#define MORSE_TIME_UNIT     150           /* Base time unit of the output code */
+
 
 
 /* Table containing the ASCII code of the character and a descriptor byte with size
@@ -26,185 +32,219 @@
 /* Some pre-processor macros to help create the aforementioned table. */
 #define DOT  1
 #define DASH 0
-#define __ENCODE_MORSE(ch, sz, mask)      { ch, (sz<<5) | (mask) }
-#define ENCODE_MORSE1(ch, a)              __ENCODE_MORSE(ch, 1, a)
-#define ENCODE_MORSE2(ch, a, b)           __ENCODE_MORSE(ch, 2, a|(b<<1))
-#define ENCODE_MORSE3(ch, a, b, c)        __ENCODE_MORSE(ch, 3, a|(b<<1)|(c<<2))
-#define ENCODE_MORSE4(ch, a, b, c, d)     __ENCODE_MORSE(ch, 4, a|(b<<1)|(c<<2)|(d<<3))
-#define ENCODE_MORSE5(ch, a, b, c, d, e)  __ENCODE_MORSE(ch, 5, a|(b<<1)|(c<<2)|(d<<3)|(e<<4))
+#define PACK_MORSE_N(ch, sz, mask)        { ch, (sz<<5) | (mask) }
+#define PACK_MORSE_1(ch, a)               PACK_MORSE_N(ch, 1, a)
+#define PACK_MORSE_2(ch, a, b)            PACK_MORSE_N(ch, 2, a|(b<<1))
+#define PACK_MORSE_3(ch, a, b, c)         PACK_MORSE_N(ch, 3, a|(b<<1)|(c<<2))
+#define PACK_MORSE_4(ch, a, b, c, d)      PACK_MORSE_N(ch, 4, a|(b<<1)|(c<<2)|(d<<3))
+#define PACK_MORSE_5(ch, a, b, c, d, e)   PACK_MORSE_N(ch, 5, a|(b<<1)|(c<<2)|(d<<3)|(e<<4))
+
+
 
 /* A nice 16-bit struct for the table. */
 typedef struct {
-  char ch;
+  char idx_ch;
   byte data;
 } morse_code_t;
 
+
+
+/* A struct to hold timed digital signals (HIGHs and LOWs). */
+typedef struct {
+  unsigned long startMillis;   /* Send signal when millis() >= starMillis */
+  byte value;                  /* LOW or HIGH */
+} signal_t;
+
+
+
 /* The actual table, marked as PROGMEM to spare precious RAM. */
 const morse_code_t morse_code_tbl[36] PROGMEM = {
-  ENCODE_MORSE1('E', DOT),
-  ENCODE_MORSE1('T', DASH),
-  ENCODE_MORSE2('A', DOT, DASH),
-  ENCODE_MORSE2('I', DOT, DOT),
-  ENCODE_MORSE2('M', DASH, DASH),
-  ENCODE_MORSE2('N', DASH, DOT),
-  ENCODE_MORSE3('D', DASH, DOT, DOT),
-  ENCODE_MORSE3('G', DASH, DASH, DOT),
-  ENCODE_MORSE3('K', DASH, DOT, DASH),
-  ENCODE_MORSE3('O', DASH, DASH, DASH),
-  ENCODE_MORSE3('R', DOT, DASH, DOT),
-  ENCODE_MORSE3('S', DOT, DOT, DOT),
-  ENCODE_MORSE3('U', DOT, DOT, DASH),
-  ENCODE_MORSE3('W', DOT, DASH, DASH),
-  ENCODE_MORSE4('B', DASH, DOT, DOT, DOT),
-  ENCODE_MORSE4('C', DASH, DOT, DASH, DOT),
-  ENCODE_MORSE4('F', DOT, DOT, DASH, DOT),
-  ENCODE_MORSE4('H', DOT, DOT, DOT, DOT),
-  ENCODE_MORSE4('J', DOT, DASH, DASH, DASH),
-  ENCODE_MORSE4('L', DOT, DASH, DOT, DOT),
-  ENCODE_MORSE4('P', DOT, DASH, DASH, DOT),
-  ENCODE_MORSE4('Q', DASH, DASH, DOT, DASH),
-  ENCODE_MORSE4('V', DOT, DOT, DOT, DASH),
-  ENCODE_MORSE4('X', DASH, DOT, DOT, DASH),
-  ENCODE_MORSE4('Y', DASH, DOT, DASH, DASH),
-  ENCODE_MORSE4('Z', DASH, DASH, DOT, DOT),
-  ENCODE_MORSE5('0', DASH, DASH, DASH, DASH, DASH),
-  ENCODE_MORSE5('1', DOT, DASH, DASH, DASH, DASH),
-  ENCODE_MORSE5('2', DOT, DOT, DASH, DASH, DASH),
-  ENCODE_MORSE5('3', DOT, DOT, DOT, DASH, DASH),
-  ENCODE_MORSE5('4', DOT, DOT, DOT, DOT, DASH),
-  ENCODE_MORSE5('5', DOT, DOT, DOT, DOT, DOT),
-  ENCODE_MORSE5('6', DASH, DOT, DOT, DOT, DOT),
-  ENCODE_MORSE5('7', DASH, DASH, DOT, DOT, DOT),
-  ENCODE_MORSE5('8', DASH, DASH, DASH, DOT, DOT),
-  ENCODE_MORSE5('9', DASH, DASH, DASH, DASH, DOT)
+  PACK_MORSE_1('E', DOT),
+  PACK_MORSE_1('T', DASH),
+  PACK_MORSE_2('A', DOT, DASH),
+  PACK_MORSE_2('I', DOT, DOT),
+  PACK_MORSE_2('M', DASH, DASH),
+  PACK_MORSE_2('N', DASH, DOT),
+  PACK_MORSE_3('D', DASH, DOT, DOT),
+  PACK_MORSE_3('G', DASH, DASH, DOT),
+  PACK_MORSE_3('K', DASH, DOT, DASH),
+  PACK_MORSE_3('O', DASH, DASH, DASH),
+  PACK_MORSE_3('R', DOT, DASH, DOT),
+  PACK_MORSE_3('S', DOT, DOT, DOT),
+  PACK_MORSE_3('U', DOT, DOT, DASH),
+  PACK_MORSE_3('W', DOT, DASH, DASH),
+  PACK_MORSE_4('B', DASH, DOT, DOT, DOT),
+  PACK_MORSE_4('C', DASH, DOT, DASH, DOT),
+  PACK_MORSE_4('F', DOT, DOT, DASH, DOT),
+  PACK_MORSE_4('H', DOT, DOT, DOT, DOT),
+  PACK_MORSE_4('J', DOT, DASH, DASH, DASH),
+  PACK_MORSE_4('L', DOT, DASH, DOT, DOT),
+  PACK_MORSE_4('P', DOT, DASH, DASH, DOT),
+  PACK_MORSE_4('Q', DASH, DASH, DOT, DASH),
+  PACK_MORSE_4('V', DOT, DOT, DOT, DASH),
+  PACK_MORSE_4('X', DASH, DOT, DOT, DASH),
+  PACK_MORSE_4('Y', DASH, DOT, DASH, DASH),
+  PACK_MORSE_4('Z', DASH, DASH, DOT, DOT),
+  PACK_MORSE_5('0', DASH, DASH, DASH, DASH, DASH),
+  PACK_MORSE_5('1', DOT, DASH, DASH, DASH, DASH),
+  PACK_MORSE_5('2', DOT, DOT, DASH, DASH, DASH),
+  PACK_MORSE_5('3', DOT, DOT, DOT, DASH, DASH),
+  PACK_MORSE_5('4', DOT, DOT, DOT, DOT, DASH),
+  PACK_MORSE_5('5', DOT, DOT, DOT, DOT, DOT),
+  PACK_MORSE_5('6', DASH, DOT, DOT, DOT, DOT),
+  PACK_MORSE_5('7', DASH, DASH, DOT, DOT, DOT),
+  PACK_MORSE_5('8', DASH, DASH, DASH, DOT, DOT),
+  PACK_MORSE_5('9', DASH, DASH, DASH, DASH, DOT)
 };
+
+
+
+/* A circular buffer to store characters. */
+CircularBuffer<char, 1536> charBuffer;
+
+/* Circular buffer used to store signals. 11 is the max number
+   of signals within a character. */
+CircularBuffer<signal_t, 11> signalBuffer;
+
+
+
+/*
+   Enqueues a signal.
+*/
+void enqueue_signal(unsigned long startMillis, int sig)
+{
+  signalBuffer.push(signal_t{startMillis, sig});
+}
+
+
+
+/*
+   Enqueues a character, checking for buffer overflow.
+*/
+void enqueue_char(char ch)
+{
+  if (!charBuffer.isFull()) {
+    charBuffer.push(ch);
+  } else {
+    Serial.print(F("Buffer full, discarding character '"));
+    Serial.print(ch);
+    Serial.println(F("'."));
+  }
+}
+
+
+
+/*
+   Reads bytes from serial and enqueue them in the character buffer.
+*/
+void enqueue_chars_from_serial() {
+  if (Serial.available())
+    enqueue_char(Serial.read());
+}
+
+
 
 /*
    Encodes a letter to morse code, using '.' for dots, '-' for dashes,
    ' ' for silence between letters and '/' for silence between words.
 */
-int encode_morse(char letter, char *buffer) {
-  int i, j, size = 0;
-  morse_code_t table_item;
+void enqueue_signals_from_chars()
+{
+  char ch;
 
-  if (letter >= 'a' && letter <= 'z') {
-    letter -= 32;
+  /* If there are still signals in the signal buffer, we must wait.
+     If there are no chars in the char buffer, we have nothing to do. */
+  if (signalBuffer.size() != 0 || charBuffer.size() == 0) {
+    return;
   }
 
-  if (letter == ' ' || letter == '\t' || letter == '\n') {
-    *buffer = '/';
-    return 1;
+  ch = charBuffer.shift(); /* Get the next char. */
+
+  if (ch >= 'a' && ch <= 'z')
+    ch -= 32;
+
+  if (ch == ' ' || ch == '\t' || ch == '\n') {
+    /* Seven time units of silence between words. But why only
+       four here? There are already one after each dot or dash,
+       and two more after each letter. */
+    enqueue_signal(millis() + (4 * MORSE_TIME_UNIT), LOW);
+    return;
   }
 
-  for (i = 0; i < 36; i++) {
-    memcpy_P(&table_item, &(morse_code_tbl[i]), sizeof(morse_code_t));
-    if (letter == table_item.ch) {
-      char data = table_item.data;
-      size = (data >> 5) & 7;
-      data = data & 31;
-      for (j = 0; j < size; j++) {
-        *(buffer++) = (data & 1) ? '.' : '-';
+  for (int i = 0; i < 36; i++) {
+    /* Load both idx and data from program memory. */
+    char     idx_ch = pgm_read_byte(&(morse_code_tbl[i].idx_ch));
+    byte     data   = pgm_read_byte(&(morse_code_tbl[i].data));
+    unsigned size;
+
+    if (ch == idx_ch) {
+      unsigned long startMillis = millis();
+      
+      size  = (data >> 5) & 7; /* 3 bits for size. */
+      data &= 31;              /* 5 bits for dots and dashes. */
+
+      for (int j = 0; j < size; j++) {
+        /* First enqueue a high signal. */
+        enqueue_signal(startMillis, HIGH);
+        /* One time unit for dots, three for dashes. */
+        startMillis += (((data & 1) == DOT) ? 1 : 3) * MORSE_TIME_UNIT;
+        /* Then enqueue a low signal. */
+        enqueue_signal(startMillis, LOW);
+        /* One time unit of silence after each dot or dash.
+           This silence need not be enqueued, we must only
+           keep track of its timing, for the next signal. */
+        startMillis += MORSE_TIME_UNIT;
         data >>= 1;
       }
-      *buffer = ' ';
-      return size + 1;
-    }
-  }
-  return 0;
-}
-
-/* A struct to hold timing and value of signals. */
-typedef struct {
-  unsigned long afterMillis;   /* Send signal when millis() >= this */
-  byte value;                  /* 0 = LOW, 1 = HIGH, duh. */
-} signal_t;
-
-
-/* CircularBuffer to store signals. 192 items is a reasonable size
-   in Arduino Uno */
-CircularBuffer<signal_t, 192> signalBuffer;
-
-/* Read bytes from serial, encode them as Morse code and enqueue
-   the signals (and silences) in the circular buffer above. */
-void readSerialAndEnqueueSignals() {
-  while (Serial.available()) {
-    int morse_size;
-    char buffer[8];
-    byte incomingByte;
-    unsigned long currentMillis;
-
-    incomingByte = Serial.read();
-
-    /* If there are already enqueued signals, enqueue the next signal
-       after the last one, otherwise, enqueue after current millis(). */
-    if (!signalBuffer.isEmpty()) {
-      currentMillis = signalBuffer.last().afterMillis;
-    } else {
-      currentMillis = millis();
-    }
-
-    morse_size = encode_morse(incomingByte, buffer);
-    for (int i = 0; i < morse_size; i++) {
-      if (buffer[i] != ' ' && buffer[i] != '/') {
-        signalBuffer.push(signal_t{currentMillis, 1});
-        switch (buffer[i]) {
-          /* 3 time units of signal for each dash - notice there is no break ;-) */
-          case '-': currentMillis += 2 * MORSE_TIME_UNIT;
-          case '.': currentMillis += MORSE_TIME_UNIT; break;
-        }
-        signalBuffer.push(signal_t{currentMillis, 0});
-      }
-      switch (buffer[i]) {
-        /* Notice there is no break in the first 2 cases */
-
-        /* 7 time units of silence after each dot or dash (4, as all characters end with 3) */
-        case '/': currentMillis += 2 * MORSE_TIME_UNIT;
-        /* 3 time units of silence after each letter (2, as all dots and dashes end with 1) */
-        case ' ': currentMillis += MORSE_TIME_UNIT;
-        /* 1 time unit of silence after each dot or dash */
-        case '.':
-        case '-': currentMillis += MORSE_TIME_UNIT; break;
-      }
-      signalBuffer.push(signal_t{currentMillis, 0});
+      /* Three time units of silence after letter. (The third
+         is the one after the dot or dash.) Now this must be
+         enqueued, since we will need this timing in the tail
+         of the queue when the next character comes. */
+      startMillis += 2 * MORSE_TIME_UNIT;
+      enqueue_signal(startMillis, LOW);
+      break;
     }
   }
 }
+
 
 
 /*
-   Output enqueued signals (and silences) to the pre-defined pin when
-   their time (er, millis()) is come.
+   Checks if there is a signal already due to be written to the pin,
+   and, if there is one, write it and remove from the queue.
 */
-void outputEnqueuedSignals() {
+void drive_pin_from_signals() {
   if (!signalBuffer.isEmpty()) {
-    byte nextSignal;
-    unsigned long nextChange, currentMillis;
-
-    currentMillis = millis();
-    nextChange = signalBuffer.first().afterMillis;
-    if (nextChange <= currentMillis) {
-      nextSignal = signalBuffer.first().value;
-      if (nextSignal != 3) {
-        digitalWrite(OUTPUT_PIN, nextSignal);
-      }
+    if (signalBuffer.first().startMillis <= millis()) {
+      digitalWrite(OUTPUT_PIN, signalBuffer.first().value);
       signalBuffer.shift();
     }
   }
 }
 
 
-/* Finally, the setup() and loop() functions! */
 
+/*
+   Finally, the setup() ...
+*/
 void setup() {
-  Serial.begin(115200);
-  while (!Serial);
-  Serial.print("Serial to Morse code running on pin ");
+  Serial.begin(115200);         /* Initializes serial interface. */
+  while (!Serial);              /* Needed for USB serial. */
+  pinMode(OUTPUT_PIN, OUTPUT);  /* Output pin is for output. */
+
+  /* A welcoming message. */
+  Serial.print(F("Serial to Morse code running on pin "));
   Serial.println(OUTPUT_PIN);
-  Serial.println("Ready.");
-  pinMode(OUTPUT_PIN, OUTPUT);
+  Serial.println(F("Ready."));
 }
 
+
+
+/*
+   ... and loop() functions.
+*/
 void loop() {
-  readSerialAndEnqueueSignals();
-  outputEnqueuedSignals();
+  enqueue_chars_from_serial();
+  enqueue_signals_from_chars();
+  drive_pin_from_signals();
 }
