@@ -48,7 +48,6 @@ typedef struct {
 } morse_code_t;
 
 
-
 /* A struct to hold timed digital signals (HIGHs and LOWs). */
 typedef struct {
   unsigned long startMillis;   /* Send signal when millis() >= starMillis */
@@ -109,57 +108,41 @@ CircularBuffer<signal_t, 11> signalBuffer;
 
 
 /*
-   Enqueues a signal.
-*/
-void enqueue_signal(unsigned long startMillis, int sig)
-{
-  signalBuffer.push(signal_t{startMillis, sig});
-}
-
-
-
-/*
-   Enqueues a character, checking for buffer overflow.
-*/
-void enqueue_char(char ch)
-{
-  if (!charBuffer.isFull()) {
-    charBuffer.push(ch);
-  } else {
-    Serial.print(F("Buffer full, discarding character '"));
-    Serial.print(ch);
-    Serial.println(F("'."));
-  }
-}
-
-
-
-/*
    Reads bytes from serial and enqueue them in the character buffer.
 */
-void enqueue_chars_from_serial() {
-  if (Serial.available())
-    enqueue_char(Serial.read());
+void enqueue_char_from_serial()
+{
+  unsigned available = Serial.available();
+ 
+  if (available > 0 && !charBuffer.isFull()) {
+    charBuffer.push(Serial.read());
+  }
+  /* If, however, our buffer is full, we don't have to worry, since
+     the UART has 64 bytes of buffer, and after this buffer is full,
+     the UART will signal the client it is not ready. The client,
+     hopefully, is not an Arduino, and will have plenty of space
+     to hold the characters. */
 }
 
 
 
 /*
-   Encodes a letter to morse code, using '.' for dots, '-' for dashes,
-   ' ' for silence between letters and '/' for silence between words.
+   Enqueues the first character in the char buffer as signals
+   timed according to the Morse code table.
 */
-void enqueue_signals_from_chars()
+void enqueue_signals_from_char()
 {
   char ch;
 
   /* If there are still signals in the signal buffer, we must wait.
      If there are no chars in the char buffer, we have nothing to do. */
-  if (signalBuffer.size() != 0 || charBuffer.size() == 0) {
+  if (!signalBuffer.isEmpty() || charBuffer.isEmpty()) {
     return;
   }
 
   ch = charBuffer.shift(); /* Get the next char. */
 
+  /* Convert lowercase to uppercase. */
   if (ch >= 'a' && ch <= 'z')
     ch -= 32;
 
@@ -167,7 +150,7 @@ void enqueue_signals_from_chars()
     /* Seven time units of silence between words. But why only
        four here? There are already one after each dot or dash,
        and two more after each letter. */
-    enqueue_signal(millis() + (4 * MORSE_TIME_UNIT), LOW);
+    signalBuffer.push(signal_t{millis() + (4 * MORSE_TIME_UNIT), LOW});
     return;
   }
 
@@ -185,11 +168,11 @@ void enqueue_signals_from_chars()
 
       for (int j = 0; j < size; j++) {
         /* First enqueue a high signal. */
-        enqueue_signal(startMillis, HIGH);
+        signalBuffer.push(signal_t{startMillis, HIGH});
         /* One time unit for dots, three for dashes. */
         startMillis += (((data & 1) == DOT) ? 1 : 3) * MORSE_TIME_UNIT;
         /* Then enqueue a low signal. */
-        enqueue_signal(startMillis, LOW);
+        signalBuffer.push(signal_t{startMillis, LOW});
         /* One time unit of silence after each dot or dash.
            This silence need not be enqueued, we must only
            keep track of its timing, for the next signal. */
@@ -201,7 +184,7 @@ void enqueue_signals_from_chars()
          enqueued, since we will need this timing in the tail
          of the queue when the next character comes. */
       startMillis += 2 * MORSE_TIME_UNIT;
-      enqueue_signal(startMillis, LOW);
+      signalBuffer.push(signal_t{startMillis, LOW});
       break;
     }
   }
@@ -213,7 +196,8 @@ void enqueue_signals_from_chars()
    Checks if there is a signal already due to be written to the pin,
    and, if there is one, write it and remove from the queue.
 */
-void drive_pin_from_signals() {
+void drive_pin_from_signal()
+{
   if (!signalBuffer.isEmpty()) {
     if (signalBuffer.first().startMillis <= millis()) {
       digitalWrite(OUTPUT_PIN, signalBuffer.first().value);
@@ -225,9 +209,10 @@ void drive_pin_from_signals() {
 
 
 /*
-   Finally, the setup() ...
+  Finally, the setup() ...
 */
-void setup() {
+void setup()
+{
   Serial.begin(115200);         /* Initializes serial interface. */
   while (!Serial);              /* Needed for USB serial. */
   pinMode(OUTPUT_PIN, OUTPUT);  /* Output pin is for output. */
@@ -241,10 +226,11 @@ void setup() {
 
 
 /*
-   ... and loop() functions.
+  ... and loop() functions.
 */
-void loop() {
-  enqueue_chars_from_serial();
-  enqueue_signals_from_chars();
-  drive_pin_from_signals();
+void loop()
+{
+  enqueue_char_from_serial();
+  enqueue_signals_from_char();
+  drive_pin_from_signal();
 }
