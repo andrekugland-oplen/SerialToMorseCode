@@ -60,46 +60,46 @@ typedef struct {
 const morse_code_t morse_code_tbl[36] PROGMEM = {
   PACK_MORSE_1('E', DOT),
   PACK_MORSE_1('T', DASH),
-  PACK_MORSE_2('A', DOT, DASH),
-  PACK_MORSE_2('I', DOT, DOT),
+  PACK_MORSE_2('A', DOT,  DASH),
+  PACK_MORSE_2('I', DOT,  DOT),
   PACK_MORSE_2('M', DASH, DASH),
   PACK_MORSE_2('N', DASH, DOT),
-  PACK_MORSE_3('D', DASH, DOT, DOT),
+  PACK_MORSE_3('D', DASH, DOT,  DOT),
   PACK_MORSE_3('G', DASH, DASH, DOT),
-  PACK_MORSE_3('K', DASH, DOT, DASH),
+  PACK_MORSE_3('K', DASH, DOT,  DASH),
   PACK_MORSE_3('O', DASH, DASH, DASH),
-  PACK_MORSE_3('R', DOT, DASH, DOT),
-  PACK_MORSE_3('S', DOT, DOT, DOT),
-  PACK_MORSE_3('U', DOT, DOT, DASH),
-  PACK_MORSE_3('W', DOT, DASH, DASH),
-  PACK_MORSE_4('B', DASH, DOT, DOT, DOT),
-  PACK_MORSE_4('C', DASH, DOT, DASH, DOT),
-  PACK_MORSE_4('F', DOT, DOT, DASH, DOT),
-  PACK_MORSE_4('H', DOT, DOT, DOT, DOT),
-  PACK_MORSE_4('J', DOT, DASH, DASH, DASH),
-  PACK_MORSE_4('L', DOT, DASH, DOT, DOT),
-  PACK_MORSE_4('P', DOT, DASH, DASH, DOT),
-  PACK_MORSE_4('Q', DASH, DASH, DOT, DASH),
-  PACK_MORSE_4('V', DOT, DOT, DOT, DASH),
-  PACK_MORSE_4('X', DASH, DOT, DOT, DASH),
-  PACK_MORSE_4('Y', DASH, DOT, DASH, DASH),
-  PACK_MORSE_4('Z', DASH, DASH, DOT, DOT),
+  PACK_MORSE_3('R', DOT,  DASH, DOT),
+  PACK_MORSE_3('S', DOT,  DOT,  DOT),
+  PACK_MORSE_3('U', DOT,  DOT,  DASH),
+  PACK_MORSE_3('W', DOT,  DASH, DASH),
+  PACK_MORSE_4('B', DASH, DOT,  DOT,  DOT),
+  PACK_MORSE_4('C', DASH, DOT,  DASH, DOT),
+  PACK_MORSE_4('F', DOT,  DOT,  DASH, DOT),
+  PACK_MORSE_4('H', DOT,  DOT,  DOT,  DOT),
+  PACK_MORSE_4('J', DOT,  DASH, DASH, DASH),
+  PACK_MORSE_4('L', DOT,  DASH, DOT,  DOT),
+  PACK_MORSE_4('P', DOT,  DASH, DASH, DOT),
+  PACK_MORSE_4('Q', DASH, DASH, DOT,  DASH),
+  PACK_MORSE_4('V', DOT,  DOT,  DOT,  DASH),
+  PACK_MORSE_4('X', DASH, DOT,  DOT,  DASH),
+  PACK_MORSE_4('Y', DASH, DOT,  DASH, DASH),
+  PACK_MORSE_4('Z', DASH, DASH, DOT,  DOT),
   PACK_MORSE_5('0', DASH, DASH, DASH, DASH, DASH),
-  PACK_MORSE_5('1', DOT, DASH, DASH, DASH, DASH),
-  PACK_MORSE_5('2', DOT, DOT, DASH, DASH, DASH),
-  PACK_MORSE_5('3', DOT, DOT, DOT, DASH, DASH),
-  PACK_MORSE_5('4', DOT, DOT, DOT, DOT, DASH),
-  PACK_MORSE_5('5', DOT, DOT, DOT, DOT, DOT),
-  PACK_MORSE_5('6', DASH, DOT, DOT, DOT, DOT),
-  PACK_MORSE_5('7', DASH, DASH, DOT, DOT, DOT),
-  PACK_MORSE_5('8', DASH, DASH, DASH, DOT, DOT),
+  PACK_MORSE_5('1', DOT,  DASH, DASH, DASH, DASH),
+  PACK_MORSE_5('2', DOT,  DOT,  DASH, DASH, DASH),
+  PACK_MORSE_5('3', DOT,  DOT,  DOT,  DASH, DASH),
+  PACK_MORSE_5('4', DOT,  DOT,  DOT,  DOT,  DASH),
+  PACK_MORSE_5('5', DOT,  DOT,  DOT,  DOT,  DOT),
+  PACK_MORSE_5('6', DASH, DOT,  DOT,  DOT,  DOT),
+  PACK_MORSE_5('7', DASH, DASH, DOT,  DOT,  DOT),
+  PACK_MORSE_5('8', DASH, DASH, DASH, DOT,  DOT),
   PACK_MORSE_5('9', DASH, DASH, DASH, DASH, DOT)
 };
 
 
 
 /* A circular buffer to store characters. */
-CircularBuffer<char, 1536> charBuffer;
+CircularBuffer<char, 1> charBuffer;
 
 /* Circular buffer used to store signals. 11 is the max number
    of signals within a character. */
@@ -117,6 +117,7 @@ void enqueue_char_from_serial()
   if (available > 0 && !charBuffer.isFull()) {
     charBuffer.push(Serial.read());
   }
+
   /* If, however, our buffer is full, we don't have to worry, since
      the UART has 64 bytes of buffer, and after this buffer is full,
      the UART will signal the client it is not ready. The client,
