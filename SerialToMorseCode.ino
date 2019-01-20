@@ -156,13 +156,11 @@ void enqueue_signals_from_char()
     /* Load both idx and data from program memory. */
     char     idx_ch = pgm_read_byte(&(morse_code_tbl[i].idx_ch));
     byte     data   = pgm_read_byte(&(morse_code_tbl[i].data));
-    unsigned size;
 
     if (ch == idx_ch) {
       unsigned long startMillis = millis();
-      
-      size  = (data >> 5) & 7; /* 3 bits for size. */
-      data &= 31;              /* 5 bits for dots and dashes. */
+      unsigned size = (data >> 5) & 7;    /* 3 bits for size. */
+      data &= 31;                         /* 5 bits for dots and dashes. */
 
       for (int j = 0; j < size; j++) {
         /* First enqueue a high signal. */
