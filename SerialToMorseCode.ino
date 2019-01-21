@@ -43,8 +43,8 @@
 
 /* A nice 16-bit struct for the table. */
 typedef struct {
-  char idx_ch;
-  byte data;
+  char idx_ch;                 /* Character */
+  byte data;                   /* Corresponding Morse code */
 } morse_code_t;
 
 
@@ -130,15 +130,13 @@ void enqueue_char_from_serial()
 */
 void enqueue_signals_from_char()
 {
-  char ch;
-
   /* If there are still signals in the signal buffer, we must wait.
      If there are no chars in the char buffer, we have nothing to do. */
   if (!signalBuffer.isEmpty() || charBuffer.isEmpty()) {
     return;
   }
 
-  ch = charBuffer.shift(); /* Get the next char. */
+  char ch = charBuffer.shift(); /* Get the next char. */
 
   /* Convert lowercase to uppercase. */
   if (ch >= 'a' && ch <= 'z')
@@ -148,19 +146,19 @@ void enqueue_signals_from_char()
     /* Seven time units of silence between words. But why only
        four here? There are already one after each dot or dash,
        and two more after each letter. */
-    signalBuffer.push(signal_t{millis() + (4 * MORSE_TIME_UNIT), LOW});
+    signalBuffer.push(signal_t{millis() + 4 * MORSE_TIME_UNIT, LOW});
     return;
   }
 
   for (int i = 0; i < 36; i++) {
     /* Load both idx and data from program memory. */
-    char     idx_ch = pgm_read_byte(&(morse_code_tbl[i].idx_ch));
-    byte     data   = pgm_read_byte(&(morse_code_tbl[i].data));
+    char idx_ch = pgm_read_byte(&(morse_code_tbl[i].idx_ch));
 
     if (ch == idx_ch) {
       unsigned long startMillis = millis();
-      unsigned size = (data >> 5) & 7;    /* 3 bits for size. */
-      data &= 31;                         /* 5 bits for dots and dashes. */
+      byte          data = pgm_read_byte(&(morse_code_tbl[i].data));
+      unsigned      size = (data >> 5) & 7;    /* 3 bits for size. */
+      data &= 31;                              /* 5 bits for dots and dashes. */
 
       for (int j = 0; j < size; j++) {
         /* First enqueue a high signal. */
@@ -179,8 +177,7 @@ void enqueue_signals_from_char()
          is the one after the dot or dash.) Now this must be
          enqueued, since we will need this timing in the tail
          of the queue when the next character comes. */
-      startMillis += 2 * MORSE_TIME_UNIT;
-      signalBuffer.push(signal_t{startMillis, LOW});
+      signalBuffer.push(signal_t{startMillis + 2 * MORSE_TIME_UNIT, LOW});
       break;
     }
   }
