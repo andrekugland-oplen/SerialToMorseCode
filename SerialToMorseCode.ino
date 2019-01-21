@@ -99,7 +99,7 @@ const morse_code_t morse_code_tbl[36] PROGMEM = {
 
 
 /* A circular buffer to store characters. */
-CircularBuffer<char, 1> charBuffer;
+CircularBuffer<char, 1536> charBuffer;
 
 /* Circular buffer used to store signals. 11 is the max number
    of signals within a character. */
