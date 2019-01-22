@@ -192,11 +192,9 @@ void enqueue_signals_from_char()
 */
 void drive_pin_from_signal()
 {
-  if (!signalBuffer.isEmpty()) {
-    if (signalBuffer.first().startMillis <= millis()) {
-      digitalWrite(OUTPUT_PIN, signalBuffer.first().value);
-      signalBuffer.shift();
-    }
+  if (!signalBuffer.isEmpty() && (signalBuffer.first().startMillis <= millis())) {
+    digitalWrite(OUTPUT_PIN, signalBuffer.first().value);
+    signalBuffer.shift();
   }
 }
 
