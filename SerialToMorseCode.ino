@@ -168,16 +168,14 @@ void enqueue_signals_from_char()
         startMillis += (((morse_data & 1) == DOT) ? 1 : 3) * MORSE_TIME_UNIT;
         /* Then enqueue a low signal. */
         signalBuffer.push(signal_t{startMillis, LOW});
-        /* One time unit of silence after each dot or dash.
-           This silence need not be enqueued, we must only
-           keep track of its timing, for the next signal. */
+        /* One time unit of silence after each dot or dash. This silence
+           need not be enqueued, but we must keep track of its timing
+           for the next signal. */
         startMillis += MORSE_TIME_UNIT;
         morse_data >>= 1;
       }
-      /* Three time units of silence after letter. (The third
-         is the one after the dot or dash.) Now this must be
-         enqueued, since we will need this timing in the tail
-         of the queue when the next character comes. */
+      /* Three time units of silence after letter. (The third is the one
+         after the last dot or dash.) */
       signalBuffer.push(signal_t{startMillis + 2 * MORSE_TIME_UNIT, LOW});
       break;
     }
