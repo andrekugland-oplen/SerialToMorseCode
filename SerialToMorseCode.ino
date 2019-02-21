@@ -20,9 +20,10 @@
 
 /* You can change the following two definitions to your liking. */
 
-#define OUTPUT_PIN          LED_BUILTIN   /* Output pin */
+#define USE_TONE            1
+#define TONE_FREQUENCY      1000
+#define OUTPUT_PIN          9             /* Output pin */
 #define MORSE_TIME_UNIT     150           /* Base time unit of the output code */
-
 
 
 /* Table containing the ASCII code of the character and a descriptor byte with size
@@ -191,7 +192,14 @@ void enqueue_signals_from_char()
 void drive_pin_from_signal()
 {
   if (!signalBuffer.isEmpty() && (signalBuffer.first().startMillis <= millis())) {
+#if USE_TONE == 0
     digitalWrite(OUTPUT_PIN, signalBuffer.first().value);
+#else
+    if (signalBuffer.first().value == HIGH)
+      tone(OUTPUT_PIN, TONE_FREQUENCY);
+     else
+      noTone(OUTPUT_PIN);
+#endif
     signalBuffer.shift();
   }
 }
